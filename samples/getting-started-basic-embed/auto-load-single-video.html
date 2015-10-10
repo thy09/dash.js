@@ -21,5 +21,32 @@
                 <source src="http://dash.edgesuite.net/envivio/dashpr/clear/Manifest.mpd" type="application/dash+xml"/>
             </video>
         </div>
+        <div style="margin:10px 0px;">
+            <label>User Keywords:</label>
+            <select><option>racing</option></select>
+            <select><option>desert</option><option>city</option></select>
+            <div><label>User Rule:</label><span style="border-bottom:1px solid black">desert & racing</span></div>
+        </div>
+        <div>Video Description:</div>
+        <div class="description">
+        </div>
     </body>
+    <script src="../../dist/zepto.min.js"></script>
+    <script>
+        $(document).ready(function(){
+            var desc = {"events":[
+                {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
+                {"start":18,"end":44,"keywords":["racing","line","desert"]},
+                {"start":44,"end":55,"keywords":["city"]},
+                {"start":55,"end":90,"keywords":["racing","city"]}
+            ]};
+            for (var i in desc.events){
+                var text = desc.events[i].start + "-" + desc.events[i].end + ":";
+                for (var j in desc.events[i].keywords){
+                    text += desc.events[i].keywords[j] + " ";
+                }
+                var elm = $("<div></div>").text(text).appendTo($(".description"));
+            }
+        });
+    </script>
 </html>
