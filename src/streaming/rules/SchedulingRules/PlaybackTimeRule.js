@@ -64,6 +64,16 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
         },
 
         execute: function(context, callback) {
+            var pbtime = this.playbackController.getTime();
+            var loop = 20;
+            var threshold = 5;
+            var remainder = parseInt(pbtime) % loop;
+            if (remainder > threshold){
+                pbtime = pbtime - remainder + loop;
+                this.playbackController.seek(pbtime);
+            }
+
+
             var mediaInfo = context.getMediaInfo(),
                 mediaType = mediaInfo.type,
                 streamId = context.getStreamInfo().id,
@@ -89,7 +99,6 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
                 request;
 
             time = hasSeekTarget ? st : ((useRejected ? (rejected.startTime) : currentTime));
-
             // limit proceeding index handler to max buffer -> limit pending requests queue
             if (!hasSeekTarget && !rejected && (time > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY)) {
                 callback(new MediaPlayer.rules.SwitchRequest(null, p));
