@@ -13085,11 +13085,32 @@ MediaPlayer.rules.PlaybackTimeRule = function() {
             scheduleController[streamId][scheduleControllerValue.streamProcessor.getType()] = scheduleControllerValue;
         },
         execute: function(context, callback) {
+            var pbtime = this.playbackController.getTime();
+            var loop = 20;
+            var threshold = 5;
+            if (pbtime > 20 && pbtime < 90) {
+                pbtime = 90;
+                this.playbackController.seek(pbtime);
+            }
             var mediaInfo = context.getMediaInfo(), mediaType = mediaInfo.type, streamId = context.getStreamInfo().id, sc = scheduleController[streamId][mediaType], EPSILON = .1, streamProcessor = scheduleController[streamId][mediaType].streamProcessor, representationInfo = streamProcessor.getCurrentRepresentationInfo(), st = seekTarget ? seekTarget[mediaType] : null, hasSeekTarget = st !== undefined && st !== null, p = hasSeekTarget ? MediaPlayer.rules.SwitchRequest.prototype.STRONG : MediaPlayer.rules.SwitchRequest.prototype.DEFAULT, rejected = sc.getFragmentModel().getRequests({
                 state: MediaPlayer.dependencies.FragmentModel.states.REJECTED
-            })[0], keepIdx = !!rejected && !hasSeekTarget, currentTime = streamProcessor.getIndexHandlerTime(), playbackTime = this.playbackController.getTime(), rejectedEnd = rejected ? rejected.startTime + rejected.duration : null, useRejected = !hasSeekTarget && rejected && (rejectedEnd > playbackTime && rejected.startTime <= currentTime || isNaN(currentTime)), buffer = streamProcessor.bufferController.getBuffer(), appendedChunks, range = null, time, request;
+            })[0], keepIdx = !!rejected && !hasSeekTarget, currentTime = streamProcessor.getIndexHandlerTime(), playbackTime = this.playbackController.getTime(), rejectedEnd = rejected ? rejected.startTime + rejected.duration : null, useRejected = !hasSeekTarget && rejected && (rejectedEnd > playbackTime && rejected.startTime <= currentTime || isNaN(currentTime)), buffer = streamProcessor.bufferController.getBuffer(), appendedChunks, range = null, time, toomuchbuffer, request;
             time = hasSeekTarget ? st : useRejected ? rejected.startTime : currentTime;
-            if (!hasSeekTarget && !rejected && time > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY) {
+            if (playbackTime <= 18 && time >= 90) {
+                toomuchbuffer = time - 72 > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY;
+            } else {
+                toomuchbuffer = time > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY;
+            }
+            if (hasSeekTarget) {
+                console.log("seek=" + st);
+            } else {
+                if (useRejected) {
+                    console.log("rejected=" + rejected.startTime);
+                }
+                console.log("currentTime=" + currentTime);
+            }
+            if (!hasSeekTarget && !rejected && toomuchbuffer) {
+                console.log("toomuchbuffer");
                 callback(new MediaPlayer.rules.SwitchRequest(null, p));
                 return;
             }
@@ -13097,6 +13118,7 @@ MediaPlayer.rules.PlaybackTimeRule = function() {
                 sc.getFragmentModel().removeRejectedRequest(rejected);
             }
             if (isNaN(time) || mediaType === "fragmentedText" && this.textSourceBuffer.getAllTracksAreDisabled()) {
+                console.log("disableed");
                 callback(new MediaPlayer.rules.SwitchRequest(null, p));
                 return;
             }
@@ -13136,7 +13158,12 @@ MediaPlayer.rules.PlaybackTimeRule = function() {
                 request = this.adapter.getNextFragmentRequest(streamProcessor, representationInfo);
             }
             if (request && !useRejected) {
-                streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
+                console.log("start = " + request.startTime);
+                if (request.startTime > 18 && request.startTime < 90) {
+                    streamProcessor.setIndexHandlerTime(90);
+                } else {
+                    streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
+                }
             }
             callback(new MediaPlayer.rules.SwitchRequest(request, p));
         },

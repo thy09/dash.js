@@ -67,13 +67,35 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
             var pbtime = this.playbackController.getTime();
             var loop = 20;
             var threshold = 5;
+            /*
             var remainder = parseInt(pbtime) % loop;
             if (remainder > threshold){
                 pbtime = pbtime - remainder + loop;
                 this.playbackController.seek(pbtime);
             }
-
-
+            */
+            /**/
+            if(pbtime > 18 && pbtime < 90){
+                pbtime = 90;
+                this.playbackController.seek(pbtime);
+            }
+            /*
+            var segments = {"events":[
+                {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
+                {"start":18,"end":44,"keywords":["racing","line","desert"]},
+                {"start":44,"end":55,"keywords":["city"]},
+                {"start":55,"end":90,"keywords":["racing"]}
+            ]};
+            for(var i in segments.events){
+                if(pbtime >= segments.events[i].start && pbtime < segments.events[i].end){
+                    if(segments.events[i].keywords.indexOf("begin") == -1 && segments.events[i].keywords.indexOf("city") == -1){
+                        pbtime  = segments.events[i].end;
+                        this.playbackController.seek(pbtime);
+                        break;
+                    }
+                }
+            }
+            */
             var mediaInfo = context.getMediaInfo(),
                 mediaType = mediaInfo.type,
                 streamId = context.getStreamInfo().id,
@@ -96,11 +118,34 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
                 appendedChunks,
                 range = null,
                 time,
+                toomuchbuffer,
                 request;
-
             time = hasSeekTarget ? st : ((useRejected ? (rejected.startTime) : currentTime));
+            if(playbackTime <= 18 && time >= 90){
+                toomuchbuffer = (time - 72 > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY);
+            }
+            else{
+                toomuchbuffer = time > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY;
+            }
+            if(hasSeekTarget){
+                console.log("seek="+st);
+            }
+            else{
+                if(useRejected){
+                    console.log("rejected="+rejected.startTime);
+                }
+                console.log("currentTime="+currentTime);
+            }
+
             // limit proceeding index handler to max buffer -> limit pending requests queue
+            /*
             if (!hasSeekTarget && !rejected && (time > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY)) {
+                callback(new MediaPlayer.rules.SwitchRequest(null, p));
+                return;
+            }*/
+            /**/
+            if (!hasSeekTarget && !rejected && toomuchbuffer) {
+                console.log("toomuchbuffer");
                 callback(new MediaPlayer.rules.SwitchRequest(null, p));
                 return;
             }
@@ -110,6 +155,7 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
             }
 
             if (isNaN(time) || (mediaType === "fragmentedText" && this.textSourceBuffer.getAllTracksAreDisabled())) {
+                console.log("disableed");
                 callback(new MediaPlayer.rules.SwitchRequest(null, p));
                 return;
             }
@@ -127,7 +173,11 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
                     }
                 }
             }
-
+            /*
+            if(time> 20 && time < 90){
+                time = 90;
+            }
+            */
             request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, time, {keepIdx: keepIdx});
 
             if (useRejected && request && request.index !== rejected.index) {
@@ -145,9 +195,17 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
             }
 
             if (request && !useRejected) {
-                streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
-            }
+                //streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
+                /**/
+                console.log("start = " + request.startTime);
+                if(request.startTime > 18 && request.startTime < 90){
+                    streamProcessor.setIndexHandlerTime(90);
+                }
+                else{
+                    streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
+                }
 
+            }
             callback(new MediaPlayer.rules.SwitchRequest(request, p));
         },
 
