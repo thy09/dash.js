@@ -108,7 +108,7 @@ MediaPlayer.di.Context = function () {
             this.system.mapSingleton('rulesController', MediaPlayer.rules.RulesController);
             this.system.mapClass('bufferLevelRule', MediaPlayer.rules.BufferLevelRule);
             this.system.mapClass('pendingRequestsRule', MediaPlayer.rules.PendingRequestsRule);
-            this.system.mapClass('playbackTimeRule', MediaPlayer.rules.PlaybackTimeRule);
+            this.system.mapClass('playbackTimeRule', MediaPlayer.rules.VideoSkimmingRule);
             this.system.mapClass('sameTimeRequestRule', MediaPlayer.rules.SameTimeRequestRule);
             this.system.mapClass('abandonRequestRule', MediaPlayer.rules.AbandonRequestsRule);
             this.system.mapSingleton('scheduleRulesCollection', MediaPlayer.rules.ScheduleRulesCollection);

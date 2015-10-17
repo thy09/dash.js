@@ -1,4 +1,7 @@
 /**
+ * Created by dangweizhen on 15/10/14.
+ */
+/**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
  * rights, including patent rights, and no such rights are granted under this license.
@@ -28,7 +31,7 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-MediaPlayer.rules.PlaybackTimeRule = function () {
+MediaPlayer.rules.VideoSkimmingRule = function () {
     "use strict";
 
     var seekTarget = {},
@@ -46,14 +49,55 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
             },0);
         };
 
+    var getNextTime = function(arr1, arr2, time) {
+        //return time;
+        //if video at time should not play, return next segment should play
+        var l1 = arr1.events.length;
+        var l2 = arr2.length;
+        if(l2 == 0) return time;
+        var rettime = time;
+        for(var i = 0;i < l1;i ++){
+            if(time >= arr1.events[i].start && time < arr1.events[i].end){
+                //console.log("segment found");
+                var skip = true;
+                for(var j = i;j < l1;j ++) {
+                    for (var k = 0; k < l2; k++) {
+                        if (arr1.events[j].keywords.indexOf(arr2[k]) !== -1) {
+                            skip = false;
+                            break;
+                        }
+                    }
+                    if (skip) {
+                        rettime = arr1.events[j].end;
+                    }
+                    else {
+                        return rettime;
+                    }
+                }
+            }
+        }
+        return rettime;
+    };
+
     return {
         adapter: undefined,
         sourceBufferExt: undefined,
         virtualBuffer: undefined,
         playbackController: undefined,
         textSourceBuffer:undefined,
+        eventsArray: undefined,
+        requiredEvents: undefined,
 
         setup: function() {
+            this.eventsArray = {"events":[
+                {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
+                {"start":18,"end":44,"keywords":["racing","line","desert"]},
+                {"start":44,"end":55,"keywords":["city"]},
+                {"start":55,"end":91,"keywords":["racing","city"]},
+                {"start":91,"end":113,"keywords":["racing","line"]},
+                {"start":113,"end":132,"keywords":["road"]},
+                {"start":132,"end":260,"keywords":["racing","desert"]}
+            ]};
             this[MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING] = onPlaybackSeeking;
         },
 
@@ -64,21 +108,30 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
         },
 
         execute: function(context, callback) {
-            var pbtime = this.playbackController.getTime();
-            var loop = 20;
-            var threshold = 5;
+            this.requiredEvents = getArray();
+            //var pbtime = this.playbackController.getTime();
+            /**/
             /*
-             var remainder = parseInt(pbtime) % loop;
-             if (remainder > threshold){
-             pbtime = pbtime - remainder + loop;
+             for(var i in this.eventsArray.events){
+             if(pbtime >= this.eventsArray.events[i].start && pbtime < this.eventsArray.events[i].end) {
+             var skip = true;
+             for (var j in this.requiredEvents) {
+             if(this.eventsArray.events[i].keywords.indexOf(this.requiredEvents[j]) !== -1){
+             skip = false;
+             break;
+             }
+             }
+             console.log("skip?" + skip);
+             if(skip){
+             pbtime = this.eventsArray.events[i].end;
              this.playbackController.seek(pbtime);
              }
+             break;
+             }
+             }
              */
-            /**/
-            if(pbtime > 18 && pbtime < 90){
-                pbtime = 90;
-                this.playbackController.seek(pbtime);
-            }
+
+
             /*
              var segments = {"events":[
              {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
@@ -118,14 +171,43 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
                 appendedChunks,
                 range = null,
                 time,
-                toomuchbuffer,
+                toomuchbuffer = false,
+                bufferedtime = 0,
                 request;
             time = hasSeekTarget ? st : ((useRejected ? (rejected.startTime) : currentTime));
-            if(playbackTime <= 18 && time >= 90){
-                toomuchbuffer = (time - 72 > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY);
+            bufferedtime = time - playbackTime;
+            var nextTime = getNextTime(this.eventsArray,this.requiredEvents,playbackTime);
+
+            if(nextTime !== playbackTime){
+                playbackTime = nextTime;
+                this.playbackController.seek(playbackTime);
             }
-            else{
-                toomuchbuffer = time > playbackTime + MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY;
+            var len = this.eventsArray.events.length;
+            for(var i = 0;i < len;i ++){
+                if(playbackTime >= this.eventsArray.events[i].start && playbackTime < this.eventsArray.events[i].end) {
+                    for(var j = i + 1;j < len;j ++){
+                        if(time >= this.eventsArray.events[j].start && time < this.eventsArray.events[j].end){
+                            break;
+                        }
+                        else{
+                            var skip = true;
+                            for (var k in this.requiredEvents) {
+                                if(this.eventsArray.events[j].keywords.indexOf(this.requiredEvents[k]) !== -1){
+                                    skip = false;
+                                    break;
+                                }
+                            }
+                            if(skip){
+                                bufferedtime -= (this.eventsArray.events[i].end - this.eventsArray.events[i].start);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            //console.log("bufferedtime = " + bufferedtime);
+            if(bufferedtime > MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY){
+                toomuchbuffer = true;
             }
             if(hasSeekTarget){
                 console.log("seek="+st);
@@ -145,7 +227,6 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
              }*/
             /**/
             if (!hasSeekTarget && !rejected && toomuchbuffer) {
-                console.log("toomuchbuffer");
                 callback(new MediaPlayer.rules.SwitchRequest(null, p));
                 return;
             }
@@ -197,13 +278,41 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
             if (request && !useRejected) {
                 //streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
                 /**/
-                console.log("start = " + request.startTime);
-                if(request.startTime > 18 && request.startTime < 90){
-                    streamProcessor.setIndexHandlerTime(90);
+                /*
+                 for(var i in this.eventsArray.events){
+                 if(request.startTime >= this.eventsArray.events[i].start && request.startTime < this.eventsArray.events[i].end) {
+                 var skip = true;
+                 for (var j in this.requiredEvents) {
+                 if(this.eventsArray.events[i].keywords.indexOf(this.requiredEvents[j]) !== -1){
+                 skip = false;
+                 break;
+                 }
+                 }
+                 if(skip){
+                 streamProcessor.setIndexHandlerTime(this.eventsArray.events[i].end);
+                 }
+                 else{
+                 streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
+                 }
+                 break;
+                 }
+                 }
+                 */
+                var newStartTime = getNextTime(this.eventsArray,this.requiredEvents,request.startTime);
+                if(newStartTime !== request.startTime){
+                    streamProcessor.setIndexHandlerTime(newStartTime);
                 }
                 else{
                     streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
                 }
+                /*
+                 if(request.startTime > 20 && request.startTime < 90){
+                 streamProcessor.setIndexHandlerTime(90);
+                 }
+                 else{
+                 streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
+                 }
+                 */
 
             }
             callback(new MediaPlayer.rules.SwitchRequest(request, p));
@@ -216,6 +325,6 @@ MediaPlayer.rules.PlaybackTimeRule = function () {
     };
 };
 
-MediaPlayer.rules.PlaybackTimeRule.prototype = {
-    constructor: MediaPlayer.rules.PlaybackTimeRule
+MediaPlayer.rules.VideoSkimmingRule.prototype = {
+    constructor: MediaPlayer.rules.VideoSkimmingRule
 };
