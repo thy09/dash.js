@@ -1,7 +1,4 @@
 /**
- * Created by dangweizhen on 15/10/14.
- */
-/**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
  * rights, including patent rights, and no such rights are granted under this license.
@@ -31,6 +28,8 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 MediaPlayer.rules.VideoSkimmingRule = function () {
     "use strict";
 
@@ -49,36 +48,47 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
             },0);
         };
 
-    var getNextTime = function(arr1, arr2, time) {
+    var getNextTime = function(arr, time) {
         //return time;
         //if video at time should not play, return next segment should play
-        var l1 = arr1.events.length;
-        var l2 = arr2.length;
-        if(l2 == 0) return time;
-        var rettime = time;
-        for(var i = 0;i < l1;i ++){
-            if(time >= arr1.events[i].start && time < arr1.events[i].end){
-                //console.log("segment found");
-                var skip = true;
-                for(var j = i;j < l1;j ++) {
-                    for (var k = 0; k < l2; k++) {
-                        if (arr1.events[j].keywords.indexOf(arr2[k]) !== -1) {
-                            skip = false;
-                            break;
-                        }
-                    }
-                    if (skip) {
-                        rettime = arr1.events[j].end;
-                    }
-                    else {
-                        return rettime;
-                    }
+
+        for(var i in arr.playEvents){
+            if(time >= arr.playEvents[i].start && time < arr.playEvents[i].end){
+                return time;
+            }
+            else{
+                if(time < arr.playEvents[i].start){
+                    return arr.playEvents[i].start;
                 }
             }
         }
-        return rettime;
+        return arr.totalTime;
     };
-
+    var getBufferedTime = function(arr,time1,time2){
+        var bt1 = 0;
+        var bt2 = 0;
+        for(var i in arr.playEvents){
+            if(time1 >= arr.playEvents[i].start){
+                if(time1 < arr.playEvents[i].end){
+                    bt1 = bt1 + time1 - arr.playEvents[i].start;
+                }
+                else{
+                    bt1 = bt1 + arr.playEvents[i].end - arr.playEvents[i].start;
+                }
+            }
+            if(time2 >= arr.playEvents[i].start){
+                if(time2 < arr.playEvents[i].end){
+                    bt2 = bt2 + time2 - arr.playEvents[i].start;
+                }
+                else{
+                    bt2 = bt2 + arr.playEvents[i].end - arr.playEvents[i].start;
+                }
+            }
+        }
+        console.log("time1:" + time1 + "time2:" + time2);
+        console.log("bt1:" + bt1 + "bt2:" + bt2);
+        return bt2 - bt1;
+    };
     return {
         adapter: undefined,
         sourceBufferExt: undefined,
@@ -108,47 +118,10 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
         },
 
         execute: function(context, callback) {
-            this.requiredEvents = getArray();
+            //this.requiredEvents = getArray();
+            var playArray = SegmentController(this.eventsArray,playRule);
             //var pbtime = this.playbackController.getTime();
             /**/
-            /*
-             for(var i in this.eventsArray.events){
-             if(pbtime >= this.eventsArray.events[i].start && pbtime < this.eventsArray.events[i].end) {
-             var skip = true;
-             for (var j in this.requiredEvents) {
-             if(this.eventsArray.events[i].keywords.indexOf(this.requiredEvents[j]) !== -1){
-             skip = false;
-             break;
-             }
-             }
-             console.log("skip?" + skip);
-             if(skip){
-             pbtime = this.eventsArray.events[i].end;
-             this.playbackController.seek(pbtime);
-             }
-             break;
-             }
-             }
-             */
-
-
-            /*
-             var segments = {"events":[
-             {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
-             {"start":18,"end":44,"keywords":["racing","line","desert"]},
-             {"start":44,"end":55,"keywords":["city"]},
-             {"start":55,"end":90,"keywords":["racing"]}
-             ]};
-             for(var i in segments.events){
-             if(pbtime >= segments.events[i].start && pbtime < segments.events[i].end){
-             if(segments.events[i].keywords.indexOf("begin") == -1 && segments.events[i].keywords.indexOf("city") == -1){
-             pbtime  = segments.events[i].end;
-             this.playbackController.seek(pbtime);
-             break;
-             }
-             }
-             }
-             */
             var mediaInfo = context.getMediaInfo(),
                 mediaType = mediaInfo.type,
                 streamId = context.getStreamInfo().id,
@@ -175,49 +148,17 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
                 bufferedtime = 0,
                 request;
             time = hasSeekTarget ? st : ((useRejected ? (rejected.startTime) : currentTime));
-            bufferedtime = time - playbackTime;
-            var nextTime = getNextTime(this.eventsArray,this.requiredEvents,playbackTime);
+
+            var nextTime = getNextTime(playArray,playbackTime);
 
             if(nextTime !== playbackTime){
                 playbackTime = nextTime;
                 this.playbackController.seek(playbackTime);
             }
-            var len = this.eventsArray.events.length;
-            for(var i = 0;i < len;i ++){
-                if(playbackTime >= this.eventsArray.events[i].start && playbackTime < this.eventsArray.events[i].end) {
-                    for(var j = i + 1;j < len;j ++){
-                        if(time >= this.eventsArray.events[j].start && time < this.eventsArray.events[j].end){
-                            break;
-                        }
-                        else{
-                            var skip = true;
-                            for (var k in this.requiredEvents) {
-                                if(this.eventsArray.events[j].keywords.indexOf(this.requiredEvents[k]) !== -1){
-                                    skip = false;
-                                    break;
-                                }
-                            }
-                            if(skip){
-                                bufferedtime -= (this.eventsArray.events[i].end - this.eventsArray.events[i].start);
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
-            //console.log("bufferedtime = " + bufferedtime);
-            if(bufferedtime > MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY){
-                toomuchbuffer = true;
-            }
-            if(hasSeekTarget){
-                console.log("seek="+st);
-            }
-            else{
-                if(useRejected){
-                    console.log("rejected="+rejected.startTime);
-                }
-                console.log("currentTime="+currentTime);
-            }
+            console.log("time = "+time);
+            bufferedtime = getBufferedTime(playArray,playbackTime,time);
+            console.log("bufferedtime = " + bufferedtime);
+
 
             // limit proceeding index handler to max buffer -> limit pending requests queue
             /*
@@ -226,6 +167,7 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
              return;
              }*/
             /**/
+            toomuchbuffer = (bufferedtime > MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY);
             if (!hasSeekTarget && !rejected && toomuchbuffer) {
                 callback(new MediaPlayer.rules.SwitchRequest(null, p));
                 return;
@@ -278,27 +220,8 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
             if (request && !useRejected) {
                 //streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
                 /**/
-                /*
-                 for(var i in this.eventsArray.events){
-                 if(request.startTime >= this.eventsArray.events[i].start && request.startTime < this.eventsArray.events[i].end) {
-                 var skip = true;
-                 for (var j in this.requiredEvents) {
-                 if(this.eventsArray.events[i].keywords.indexOf(this.requiredEvents[j]) !== -1){
-                 skip = false;
-                 break;
-                 }
-                 }
-                 if(skip){
-                 streamProcessor.setIndexHandlerTime(this.eventsArray.events[i].end);
-                 }
-                 else{
-                 streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
-                 }
-                 break;
-                 }
-                 }
-                 */
-                var newStartTime = getNextTime(this.eventsArray,this.requiredEvents,request.startTime);
+
+                var newStartTime = getNextTime(playArray,request.startTime);
                 if(newStartTime !== request.startTime){
                     streamProcessor.setIndexHandlerTime(newStartTime);
                 }
@@ -327,4 +250,37 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
 
 MediaPlayer.rules.VideoSkimmingRule.prototype = {
     constructor: MediaPlayer.rules.VideoSkimmingRule
+};
+
+SegmentController = function(segArray, callback){
+    var playArray = new Array();
+    for(var i in segArray.events){
+        if(callback(segArray.events[i])){
+            playArray.push(segArray.events[i]);
+        }
+    }
+    return {"playEvents":playArray,"totalTime":segArray.events[segArray.events.length-1].end};
+};
+
+function playRule(arg){
+    var requiredEvents = getArray();
+    if(requiredEvents.length == 0) return true;
+    for(var i in requiredEvents){
+        if(arg.keywords.indexOf(requiredEvents[i]) != -1){
+            return true;
+        }
+    }
+    return false;
+};
+
+function getArray(){
+    var id = document.getElementsByName('tag');
+    var value = new Array();
+    for(var i = 0; i < id.length; i++){
+        if(id[i].checked) {
+            value.push(id[i].value);
+        }
+    }
+
+    return value;
 };

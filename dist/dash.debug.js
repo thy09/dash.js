@@ -2280,6 +2280,7 @@ Dash.dependencies.DashAdapter.prototype = {
 Dash.create = function(video, source, context) {
     if (typeof video === "undefined" || video.nodeName != "VIDEO") return null;
     var player, videoID = video.id || video.name || "video element";
+    console.log(video.name);
     context = context || new Dash.di.DashContext();
     source = source || [].slice.call(video.querySelectorAll("source")).filter(function(s) {
         return s.type == Dash.supportedManifestMimeTypes.mimeType;
@@ -2309,7 +2310,6 @@ Dash.createAll = function(className, scope, context) {
         var player = Dash.create(videos[i], undefined, context);
         aPlayers.push(player);
     }
-    console.log("init end!");
     return aPlayers;
 };
 
@@ -12756,7 +12756,6 @@ MediaPlayer.rules.ThroughputRule = function() {
                     switchRequest = new MediaPlayer.rules.SwitchRequest(newQuality, MediaPlayer.rules.SwitchRequest.prototype.DEFAULT);
                 }
                 if (switchRequest.value !== MediaPlayer.rules.SwitchRequest.prototype.NO_CHANGE && switchRequest.value !== current) {
-                    console.log("233333333333333333");
                     self.log("ThroughputRule requesting switch to index: ", switchRequest.value, "type: ", mediaType, " Priority: ", switchRequest.priority === MediaPlayer.rules.SwitchRequest.prototype.DEFAULT ? "Default" : switchRequest.priority === MediaPlayer.rules.SwitchRequest.prototype.STRONG ? "Strong" : "Weak", "Average throughput", Math.round(averageThroughput), "kbps");
                 }
             }
@@ -13021,6 +13020,216 @@ MediaPlayer.rules.BufferLevelRule = function() {
 MediaPlayer.rules.BufferLevelRule.prototype = {
     constructor: MediaPlayer.rules.BufferLevelRule
 };
+
+MediaPlayer.rules.VideoSkimmingRule = function() {
+    "use strict";
+    var seekTarget = {}, scheduleController = {}, onPlaybackSeeking = function(e) {
+        setTimeout(function() {
+            var time = e.data.seekTime;
+            seekTarget.audio = time;
+            seekTarget.video = time;
+            seekTarget.fragmentedText = time;
+        }, 0);
+    };
+    var getNextTime = function(arr, time) {
+        for (var i in arr.playEvents) {
+            if (time >= arr.playEvents[i].start && time < arr.playEvents[i].end) {
+                return time;
+            } else {
+                if (time < arr.playEvents[i].start) {
+                    return arr.playEvents[i].start;
+                }
+            }
+        }
+        return arr.totalTime;
+    };
+    var getBufferedTime = function(arr, time1, time2) {
+        var bt1 = 0;
+        var bt2 = 0;
+        for (var i in arr.playEvents) {
+            if (time1 >= arr.playEvents[i].start) {
+                if (time1 < arr.playEvents[i].end) {
+                    bt1 = bt1 + time1 - arr.playEvents[i].start;
+                } else {
+                    bt1 = bt1 + arr.playEvents[i].end - arr.playEvents[i].start;
+                }
+            }
+            if (time2 >= arr.playEvents[i].start) {
+                if (time2 < arr.playEvents[i].end) {
+                    bt2 = bt2 + time2 - arr.playEvents[i].start;
+                } else {
+                    bt2 = bt2 + arr.playEvents[i].end - arr.playEvents[i].start;
+                }
+            }
+        }
+        console.log("time1:" + time1 + "time2:" + time2);
+        console.log("bt1:" + bt1 + "bt2:" + bt2);
+        return bt2 - bt1;
+    };
+    return {
+        adapter: undefined,
+        sourceBufferExt: undefined,
+        virtualBuffer: undefined,
+        playbackController: undefined,
+        textSourceBuffer: undefined,
+        eventsArray: undefined,
+        requiredEvents: undefined,
+        setup: function() {
+            this.eventsArray = {
+                events: [ {
+                    start: 0,
+                    end: 18,
+                    keywords: [ "begin", "curve", "racing", "desert" ]
+                }, {
+                    start: 18,
+                    end: 44,
+                    keywords: [ "racing", "line", "desert" ]
+                }, {
+                    start: 44,
+                    end: 55,
+                    keywords: [ "city" ]
+                }, {
+                    start: 55,
+                    end: 91,
+                    keywords: [ "racing", "city" ]
+                }, {
+                    start: 91,
+                    end: 113,
+                    keywords: [ "racing", "line" ]
+                }, {
+                    start: 113,
+                    end: 132,
+                    keywords: [ "road" ]
+                }, {
+                    start: 132,
+                    end: 260,
+                    keywords: [ "racing", "desert" ]
+                } ]
+            };
+            this[MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING] = onPlaybackSeeking;
+        },
+        setScheduleController: function(scheduleControllerValue) {
+            var streamId = scheduleControllerValue.streamProcessor.getStreamInfo().id;
+            scheduleController[streamId] = scheduleController[streamId] || {};
+            scheduleController[streamId][scheduleControllerValue.streamProcessor.getType()] = scheduleControllerValue;
+        },
+        execute: function(context, callback) {
+            var playArray = SegmentController(this.eventsArray, playRule);
+            var mediaInfo = context.getMediaInfo(), mediaType = mediaInfo.type, streamId = context.getStreamInfo().id, sc = scheduleController[streamId][mediaType], EPSILON = .1, streamProcessor = scheduleController[streamId][mediaType].streamProcessor, representationInfo = streamProcessor.getCurrentRepresentationInfo(), st = seekTarget ? seekTarget[mediaType] : null, hasSeekTarget = st !== undefined && st !== null, p = hasSeekTarget ? MediaPlayer.rules.SwitchRequest.prototype.STRONG : MediaPlayer.rules.SwitchRequest.prototype.DEFAULT, rejected = sc.getFragmentModel().getRequests({
+                state: MediaPlayer.dependencies.FragmentModel.states.REJECTED
+            })[0], keepIdx = !!rejected && !hasSeekTarget, currentTime = streamProcessor.getIndexHandlerTime(), playbackTime = this.playbackController.getTime(), rejectedEnd = rejected ? rejected.startTime + rejected.duration : null, useRejected = !hasSeekTarget && rejected && (rejectedEnd > playbackTime && rejected.startTime <= currentTime || isNaN(currentTime)), buffer = streamProcessor.bufferController.getBuffer(), appendedChunks, range = null, time, toomuchbuffer = false, bufferedtime = 0, request;
+            time = hasSeekTarget ? st : useRejected ? rejected.startTime : currentTime;
+            var nextTime = getNextTime(playArray, playbackTime);
+            if (nextTime !== playbackTime) {
+                playbackTime = nextTime;
+                this.playbackController.seek(playbackTime);
+            }
+            console.log("time = " + time);
+            bufferedtime = getBufferedTime(playArray, playbackTime, time);
+            console.log("bufferedtime = " + bufferedtime);
+            toomuchbuffer = bufferedtime > MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY;
+            if (!hasSeekTarget && !rejected && toomuchbuffer) {
+                callback(new MediaPlayer.rules.SwitchRequest(null, p));
+                return;
+            }
+            if (rejected) {
+                sc.getFragmentModel().removeRejectedRequest(rejected);
+            }
+            if (isNaN(time) || mediaType === "fragmentedText" && this.textSourceBuffer.getAllTracksAreDisabled()) {
+                console.log("disableed");
+                callback(new MediaPlayer.rules.SwitchRequest(null, p));
+                return;
+            }
+            if (hasSeekTarget) {
+                seekTarget[mediaType] = null;
+            }
+            if (buffer) {
+                range = this.sourceBufferExt.getBufferRange(streamProcessor.bufferController.getBuffer(), time);
+                if (range !== null) {
+                    appendedChunks = this.virtualBuffer.getChunks({
+                        streamId: streamId,
+                        mediaType: mediaType,
+                        appended: true,
+                        mediaInfo: mediaInfo,
+                        forRange: range
+                    });
+                    if (appendedChunks && appendedChunks.length > 0) {
+                        time = appendedChunks[appendedChunks.length - 1].bufferedRange.end;
+                    }
+                }
+            }
+            request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, time, {
+                keepIdx: keepIdx
+            });
+            if (useRejected && request && request.index !== rejected.index) {
+                request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, rejected.startTime + rejected.duration / 2 + EPSILON, {
+                    keepIdx: keepIdx,
+                    timeThreshold: 0
+                });
+            }
+            while (request && streamProcessor.getFragmentModel().isFragmentLoadedOrPending(request)) {
+                if (request.action === "complete") {
+                    request = null;
+                    streamProcessor.setIndexHandlerTime(NaN);
+                    break;
+                }
+                request = this.adapter.getNextFragmentRequest(streamProcessor, representationInfo);
+            }
+            if (request && !useRejected) {
+                var newStartTime = getNextTime(playArray, request.startTime);
+                if (newStartTime !== request.startTime) {
+                    streamProcessor.setIndexHandlerTime(newStartTime);
+                } else {
+                    streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
+                }
+            }
+            callback(new MediaPlayer.rules.SwitchRequest(request, p));
+        },
+        reset: function() {
+            seekTarget = {};
+            scheduleController = {};
+        }
+    };
+};
+
+MediaPlayer.rules.VideoSkimmingRule.prototype = {
+    constructor: MediaPlayer.rules.VideoSkimmingRule
+};
+
+SegmentController = function(segArray, callback) {
+    var playArray = new Array();
+    for (var i in segArray.events) {
+        if (callback(segArray.events[i])) {
+            playArray.push(segArray.events[i]);
+        }
+    }
+    return {
+        playEvents: playArray,
+        totalTime: segArray.events[segArray.events.length - 1].end
+    };
+};
+
+function playRule(arg) {
+    var requiredEvents = getArray();
+    if (requiredEvents.length == 0) return true;
+    for (var i in requiredEvents) {
+        if (arg.keywords.indexOf(requiredEvents[i]) != -1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function getArray() {
+    var id = document.getElementsByName("tag");
+    var value = new Array();
+    for (var i = 0; i < id.length; i++) {
+        if (id[i].checked) {
+            value.push(id[i].value);
+        }
+    }
+    return value;
+}
 
 MediaPlayer.rules.PendingRequestsRule = function() {
     "use strict";
@@ -13350,201 +13559,6 @@ MediaPlayer.rules.ScheduleRulesCollection.prototype = {
     FRAGMENTS_TO_SCHEDULE_RULES: "fragmentsToScheduleRules",
     NEXT_FRAGMENT_RULES: "nextFragmentRules",
     FRAGMENTS_TO_EXECUTE_RULES: "fragmentsToExecuteRules"
-};
-
-MediaPlayer.rules.VideoSkimmingRule = function() {
-    "use strict";
-    var seekTarget = {}, scheduleController = {}, onPlaybackSeeking = function(e) {
-        setTimeout(function() {
-            var time = e.data.seekTime;
-            seekTarget.audio = time;
-            seekTarget.video = time;
-            seekTarget.fragmentedText = time;
-        }, 0);
-    };
-    var getNextTime = function(arr1, arr2, time) {
-        var l1 = arr1.events.length;
-        var l2 = arr2.length;
-        if (l2 == 0) return time;
-        var rettime = time;
-        for (var i = 0; i < l1; i++) {
-            if (time >= arr1.events[i].start && time < arr1.events[i].end) {
-                var skip = true;
-                for (var j = i; j < l1; j++) {
-                    for (var k = 0; k < l2; k++) {
-                        if (arr1.events[j].keywords.indexOf(arr2[k]) !== -1) {
-                            skip = false;
-                            break;
-                        }
-                    }
-                    if (skip) {
-                        rettime = arr1.events[j].end;
-                    } else {
-                        return rettime;
-                    }
-                }
-            }
-        }
-        return rettime;
-    };
-    return {
-        adapter: undefined,
-        sourceBufferExt: undefined,
-        virtualBuffer: undefined,
-        playbackController: undefined,
-        textSourceBuffer: undefined,
-        eventsArray: undefined,
-        requiredEvents: undefined,
-        setup: function() {
-            this.eventsArray = {
-                events: [ {
-                    start: 0,
-                    end: 18,
-                    keywords: [ "begin", "curve", "racing", "desert" ]
-                }, {
-                    start: 18,
-                    end: 44,
-                    keywords: [ "racing", "line", "desert" ]
-                }, {
-                    start: 44,
-                    end: 55,
-                    keywords: [ "city" ]
-                }, {
-                    start: 55,
-                    end: 91,
-                    keywords: [ "racing", "city" ]
-                }, {
-                    start: 91,
-                    end: 113,
-                    keywords: [ "racing", "line" ]
-                }, {
-                    start: 113,
-                    end: 132,
-                    keywords: [ "road" ]
-                }, {
-                    start: 132,
-                    end: 260,
-                    keywords: [ "racing", "desert" ]
-                } ]
-            };
-            this[MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING] = onPlaybackSeeking;
-        },
-        setScheduleController: function(scheduleControllerValue) {
-            var streamId = scheduleControllerValue.streamProcessor.getStreamInfo().id;
-            scheduleController[streamId] = scheduleController[streamId] || {};
-            scheduleController[streamId][scheduleControllerValue.streamProcessor.getType()] = scheduleControllerValue;
-        },
-        execute: function(context, callback) {
-            this.requiredEvents = getArray();
-            var mediaInfo = context.getMediaInfo(), mediaType = mediaInfo.type, streamId = context.getStreamInfo().id, sc = scheduleController[streamId][mediaType], EPSILON = .1, streamProcessor = scheduleController[streamId][mediaType].streamProcessor, representationInfo = streamProcessor.getCurrentRepresentationInfo(), st = seekTarget ? seekTarget[mediaType] : null, hasSeekTarget = st !== undefined && st !== null, p = hasSeekTarget ? MediaPlayer.rules.SwitchRequest.prototype.STRONG : MediaPlayer.rules.SwitchRequest.prototype.DEFAULT, rejected = sc.getFragmentModel().getRequests({
-                state: MediaPlayer.dependencies.FragmentModel.states.REJECTED
-            })[0], keepIdx = !!rejected && !hasSeekTarget, currentTime = streamProcessor.getIndexHandlerTime(), playbackTime = this.playbackController.getTime(), rejectedEnd = rejected ? rejected.startTime + rejected.duration : null, useRejected = !hasSeekTarget && rejected && (rejectedEnd > playbackTime && rejected.startTime <= currentTime || isNaN(currentTime)), buffer = streamProcessor.bufferController.getBuffer(), appendedChunks, range = null, time, toomuchbuffer = false, bufferedtime = 0, request;
-            time = hasSeekTarget ? st : useRejected ? rejected.startTime : currentTime;
-            bufferedtime = time - playbackTime;
-            var nextTime = getNextTime(this.eventsArray, this.requiredEvents, playbackTime);
-            if (nextTime !== playbackTime) {
-                playbackTime = nextTime;
-                this.playbackController.seek(playbackTime);
-            }
-            var len = this.eventsArray.events.length;
-            for (var i = 0; i < len; i++) {
-                if (playbackTime >= this.eventsArray.events[i].start && playbackTime < this.eventsArray.events[i].end) {
-                    for (var j = i + 1; j < len; j++) {
-                        if (time >= this.eventsArray.events[j].start && time < this.eventsArray.events[j].end) {
-                            break;
-                        } else {
-                            var skip = true;
-                            for (var k in this.requiredEvents) {
-                                if (this.eventsArray.events[j].keywords.indexOf(this.requiredEvents[k]) !== -1) {
-                                    skip = false;
-                                    break;
-                                }
-                            }
-                            if (skip) {
-                                bufferedtime -= this.eventsArray.events[i].end - this.eventsArray.events[i].start;
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
-            if (bufferedtime > MediaPlayer.dependencies.BufferController.BUFFER_TIME_AT_TOP_QUALITY) {
-                toomuchbuffer = true;
-            }
-            if (hasSeekTarget) {
-                console.log("seek=" + st);
-            } else {
-                if (useRejected) {
-                    console.log("rejected=" + rejected.startTime);
-                }
-                console.log("currentTime=" + currentTime);
-            }
-            if (!hasSeekTarget && !rejected && toomuchbuffer) {
-                callback(new MediaPlayer.rules.SwitchRequest(null, p));
-                return;
-            }
-            if (rejected) {
-                sc.getFragmentModel().removeRejectedRequest(rejected);
-            }
-            if (isNaN(time) || mediaType === "fragmentedText" && this.textSourceBuffer.getAllTracksAreDisabled()) {
-                console.log("disableed");
-                callback(new MediaPlayer.rules.SwitchRequest(null, p));
-                return;
-            }
-            if (hasSeekTarget) {
-                seekTarget[mediaType] = null;
-            }
-            if (buffer) {
-                range = this.sourceBufferExt.getBufferRange(streamProcessor.bufferController.getBuffer(), time);
-                if (range !== null) {
-                    appendedChunks = this.virtualBuffer.getChunks({
-                        streamId: streamId,
-                        mediaType: mediaType,
-                        appended: true,
-                        mediaInfo: mediaInfo,
-                        forRange: range
-                    });
-                    if (appendedChunks && appendedChunks.length > 0) {
-                        time = appendedChunks[appendedChunks.length - 1].bufferedRange.end;
-                    }
-                }
-            }
-            request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, time, {
-                keepIdx: keepIdx
-            });
-            if (useRejected && request && request.index !== rejected.index) {
-                request = this.adapter.getFragmentRequestForTime(streamProcessor, representationInfo, rejected.startTime + rejected.duration / 2 + EPSILON, {
-                    keepIdx: keepIdx,
-                    timeThreshold: 0
-                });
-            }
-            while (request && streamProcessor.getFragmentModel().isFragmentLoadedOrPending(request)) {
-                if (request.action === "complete") {
-                    request = null;
-                    streamProcessor.setIndexHandlerTime(NaN);
-                    break;
-                }
-                request = this.adapter.getNextFragmentRequest(streamProcessor, representationInfo);
-            }
-            if (request && !useRejected) {
-                var newStartTime = getNextTime(this.eventsArray, this.requiredEvents, request.startTime);
-                if (newStartTime !== request.startTime) {
-                    streamProcessor.setIndexHandlerTime(newStartTime);
-                } else {
-                    streamProcessor.setIndexHandlerTime(request.startTime + request.duration);
-                }
-            }
-            callback(new MediaPlayer.rules.SwitchRequest(request, p));
-        },
-        reset: function() {
-            seekTarget = {};
-            scheduleController = {};
-        }
-    };
-};
-
-MediaPlayer.rules.VideoSkimmingRule.prototype = {
-    constructor: MediaPlayer.rules.VideoSkimmingRule
 };
 
 MediaPlayer.rules.SwitchRequest = function(v, p) {

@@ -137,7 +137,6 @@ MediaPlayer = function (context) {
             system.mapOutlet("numOfParallelRequestAllowed", "scheduleController");
             system.mapValue("bufferMax", bufferMax);
             system.mapOutlet("bufferMax", "bufferController");
-
             rulesController.initialize();
         },
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8"/>
     <title>Auto-player instantiation example, single videoElement</title>
 
-    <script src="../../dist/dash.debug.js"></script>
+    <script src="../../dist/dash.debug.js?v=151020"></script>
     <!--dash.all.js should be used in production over dash.debug.js. dash.debug.js is not compressed or obfuscated and the file size is much larger compared with dash.all.js-->
     <!--<script src="../../dist/dash.all.js"></script>-->
 
@@ -36,21 +36,11 @@
         <input type="checkbox" name="tag" value="city" />city
         <input type="checkbox" name="tag" value="road" />road
         <input type="checkbox" name="tag" value="end" />end
+        <input type="checkbox" name="tag" value="line" />line
         <input type="button" value="clear all" onclick="clearAll()" />
         </div>
         <script>
-        function getArray(){
-            var id = document.getElementsByName('tag');
-            var value = new Array();
-            for(var i = 0; i < id.length; i++){
-                if(id[i].checked) {
-                    value.push(id[i].value);
-                }
-            }
 
-            return value;
-            //window.location ='某Action!netWorkingUpdate?concentratorids='+value.toString();
-        };
         function clearAll(){
             var id = document.getElementsByName('tag');
             for(var i = 0; i < id.length; i++){
