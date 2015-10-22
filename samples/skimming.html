@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>Auto-player instantiation example, single videoElement</title>
+
+    <script src="../dist/dash.debug.js?v=151020"></script>
+    <!--dash.all.js should be used in production over dash.debug.js. dash.debug.js is not compressed or obfuscated and the file size is much larger compared with dash.all.js-->
+    <!--<script src="../../dist/dash.all.js"></script>-->
+
+    <style>
+        video {
+            width: 640px;
+            height: 360px;
+        }
+    </style>
+
+    <body onload="Dash.createAll()">
+        <div style="width:50%">
+            <video class="dashjs-player" autoplay preload="none" style="width:100%">
+                <source src="http://202.127.216.22:8000/racing/Manifest.mpd" type="application/dash+xml"/>
+            </video>
+            <div id="videoController" class="video-controller unselectable">
+                <div id="playPauseBtn" class="btn-play-pause" title="Play/Pause">
+                    <span id="iconPlayPause" class="icon-play"></span>
+                </div>
+                <span id="videoTime" class="time-display">00:00:00</span>
+
+                <div id="fullscreenBtn" class="btn-fullscreen" title="Fullscreen">
+                    <span class="icon-fullscreen-enter"></span>
+                </div>
+                <input type="range" id="volumebar" class="volumebar" value="1" min="0" max="1" step=".01" />
+
+                <div id="muteBtn" class="btn-mute" title="Mute">
+                    <span id="iconMute" class="icon-mute-off"></span>
+                </div>
+                <div id="captionBtn" class="btn-caption" title="Closed Caption">
+                    <span class="icon-caption"></span>
+                </div>
+
+                <span id="videoDuration" class="duration-display">00:00:00</span>
+
+                <div class="seekContainer">
+                    <input type="range" id="seekbar" value="0" class="seekbar" min="0" step="0.01"/>
+                </div>
+            </div>
+        </div>
+        <!--
+        <div style="margin:10px 0px;">
+            <label>User Keywords:</label>
+            <select><option>racing</option></select>
+            <select><option>desert</option><option>city</option></select>
+            <div><label>User Rule:</label><span style="border-bottom:1px solid black">desert & racing</span></div>
+        </div>
+        -->
+        <div>User Rule:
+        <input type="checkbox" name="tag" value="begin" />begin
+        <input type="checkbox" name="tag" value="racing" />racing
+        <input type="checkbox" name="tag" value="desert" />desert
+        <input type="checkbox" name="tag" value="city" />city
+        <input type="checkbox" name="tag" value="road" />road
+        <input type="checkbox" name="tag" value="end" />end
+        <input type="checkbox" name="tag" value="line" />line
+        <input type="button" value="clear all" onclick="clearAll()" />
+        </div>
+        <script>
+
+        function clearAll(){
+            var id = document.getElementsByName('tag');
+            for(var i = 0; i < id.length; i++){
+                id[i].checked = false;
+            }
+        };
+        </script>
+        <div>Video Description:</div>
+        <div class="description">
+        </div>
+    </body>
+<link rel="stylesheet" href="../contrib/akamai/controlbar/contolbar.css">
+    <script src="../dist/zepto.min.js"></script>
+<script src="../contrib/akamai/controlbar/ControlBar.js"></script>
+    <script>
+        $(document).ready(function(){
+            var desc = {"events":[
+                {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
+                {"start":18,"end":44,"keywords":["racing","line","desert"]},
+                {"start":44,"end":55,"keywords":["city"]},
+                {"start":55,"end":91,"keywords":["racing","city"]},
+                {"start":91,"end":113,"keywords":["racing","line"]},
+                {"start":113,"end":132,"keywords":["road"]},
+                {"start":132,"end":260,"keywords":["racing","desert"]}
+            ]};
+            for (var i in desc.events){
+                var text = desc.events[i].start + "-" + desc.events[i].end + ":";
+                for (var j in desc.events[i].keywords){
+                    text += desc.events[i].keywords[j] + " ";
+                }
+                var elm = $("<div></div>").text(text).appendTo($(".description"));
+            }
+        });
+        $("video").each(function(idx,elm){elm.controls = false;});
+    </script>
+</html>
