@@ -5,6 +5,8 @@
     <title>Auto-player instantiation example, single videoElement</title>
 
     <script src="../dist/dash.debug.js?v=151020"></script>
+    <script src="../contrib/akamai/controlbar/ControlBar.js"></script>
+    <link rel="stylesheet" href="../contrib/akamai/controlbar/contolbar.css">
     <!--dash.all.js should be used in production over dash.debug.js. dash.debug.js is not compressed or obfuscated and the file size is much larger compared with dash.all.js-->
     <!--<script src="../../dist/dash.all.js"></script>-->
 
@@ -13,10 +15,34 @@
             width: 640px;
             height: 360px;
         }
+        .seekContainer{
+            position:relative;
+        }
+        .tags{
+            position: absolute;
+            top: 35%;
+            width:100%;
+            height:35%;
+        }
+        .tag{
+            position:absolute;
+            height: 100%;
+            width: 3px;
+            background: red;;
+        }
+        .tag.active{
+            background: green;
+        }
+        .seekContainer{
+            padding-right: 0px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            width: 5px;
+         }
     </style>
 
-    <body onload="Dash.createAll()">
-        <div style="width:50%">
+    <body onload="">
+        <div style="width:640px">
             <video class="dashjs-player" autoplay preload="none" style="width:100%">
                 <source src="http://202.127.216.22:8000/racing/Manifest.mpd" type="application/dash+xml"/>
             </video>
@@ -41,7 +67,8 @@
                 <span id="videoDuration" class="duration-display">00:00:00</span>
 
                 <div class="seekContainer">
-                    <input type="range" id="seekbar" value="0" class="seekbar" min="0" step="0.01"/>
+                    <input type="range" id="seekbar" value="0" class="seekbar" min="0" step="0.01" style="margin:12px 0px;"/>
+                    <div class="tags"></div>
                 </div>
             </div>
         </div>
@@ -53,7 +80,9 @@
             <div><label>User Rule:</label><span style="border-bottom:1px solid black">desert & racing</span></div>
         </div>
         -->
-        <div>User Rule:
+        <button class="btn btn-primary" onclick="prev_event()">Prev</button>
+        <button class="btn btn-primary" onclick = "next_event()">Next</button>
+        <div class="rules">User Rule:
         <input type="checkbox" name="tag" value="begin" />begin
         <input type="checkbox" name="tag" value="racing" />racing
         <input type="checkbox" name="tag" value="desert" />desert
@@ -63,6 +92,7 @@
         <input type="checkbox" name="tag" value="line" />line
         <input type="button" value="clear all" onclick="clearAll()" />
         </div>
+
         <script>
 
         function clearAll(){
@@ -76,28 +106,110 @@
         <div class="description">
         </div>
     </body>
-<link rel="stylesheet" href="../contrib/akamai/controlbar/contolbar.css">
     <script src="../dist/zepto.min.js"></script>
 <script src="../contrib/akamai/controlbar/ControlBar.js"></script>
     <script>
+        var desc = {"events":[
+        {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
+        {"start":18,"end":44,"keywords":["racing","line","desert"]},
+        {"start":44,"end":55,"keywords":["city"]},
+        {"start":55,"end":91,"keywords":["racing","city"]},
+        {"start":91,"end":113,"keywords":["racing","line"]},
+        {"start":113,"end":132,"keywords":["road"]},
+        {"start":132,"end":220,"keywords":["racing","desert"]},
+            {"start":220,"end":260,"keywords":["end"]},
+        ]};
+        var myrule = {};
+        var active= [];
+        var update_tag = function(){
+            var tags = $(".tags .tag");
+            for (var i in desc.events){
+                var yes = false;
+                for (var j in desc.events[i].keywords){
+                    if (myrule[desc.events[i].keywords[j]]){
+                        yes = true;
+                    }
+                }
+                if (yes){
+                    active[i] = true;
+                    $(tags[i]).addClass("active");
+                }else{
+                    $(tags[i]).removeClass("active");
+                    active[i] = false;
+                }
+            }
+        }
+        var player = undefined;
+        var video = undefined;
+        var cur_event = function(){
+            var cur = player.time();
+            for (var i=0;i<desc.events.length;i++){
+                if (cur>=desc.events[i].start && cur<desc.events[i].end){
+                    return i;
+                }
+            }
+        }
+        var next_event = function(){
+            var idx = cur_event();
+            for (var i=idx+1;i<desc.events.length;i++){
+                if (active[i]){
+                    player.seek(desc.events[i].start);
+                    return;
+                }
+            }
+            player.seek(desc.events[idx].end);
+        }
+        var prev_event = function(){
+            var idx = cur_event();
+            for (var i=idx-1;i>=0;i--){
+                if (active[i]){
+                    player.seek(desc.events[i].start);
+                    return;
+                }
+            }
+            player.seek(desc.events[idx].start);
+        }
         $(document).ready(function(){
-            var desc = {"events":[
-                {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
-                {"start":18,"end":44,"keywords":["racing","line","desert"]},
-                {"start":44,"end":55,"keywords":["city"]},
-                {"start":55,"end":91,"keywords":["racing","city"]},
-                {"start":91,"end":113,"keywords":["racing","line"]},
-                {"start":113,"end":132,"keywords":["road"]},
-                {"start":132,"end":260,"keywords":["racing","desert"]}
-            ]};
+
             for (var i in desc.events){
                 var text = desc.events[i].start + "-" + desc.events[i].end + ":";
+                var total = 260;
+                var tag = $("<div></div>").addClass("tag").attr("style","left:"+(desc.events[i].start*99)/total+"%;");
+                $(".tags").append(tag);
                 for (var j in desc.events[i].keywords){
                     text += desc.events[i].keywords[j] + " ";
                 }
+                active.push(true);
                 var elm = $("<div></div>").text(text).appendTo($(".description"));
             }
+            $(".rules input").each(function(idx,elm){
+                myrule[elm.value] = true;
+            });
+            $(".rules input").change(function(elm){
+                var choosed = false;
+                $(".rules input").each(function(idx,elm){
+                    if (elm.checked) {
+                        myrule[elm.value] = true;
+                        choosed = true;
+                    }else{
+                        myrule[elm.value] = false;
+                    }
+                });
+                if (!choosed){
+                    $(".rules input").each(function(idx,elm){
+                       myrule[elm.value] = true;
+                    });
+                }
+                update_tag();
+            });
+            update_tag();
+            $("video").each(function(idx,elm){elm.controls = false;});
+            var players = Dash.createAll();
+            var video = document.querySelector(".dash-video-player video");
+            player = players[0];
+            controlbar = new ControlBar(player, video);
+            controlbar.initialize();
+            controlbar.disable();
         });
-        $("video").each(function(idx,elm){elm.controls = false;});
     </script>
 </html>
