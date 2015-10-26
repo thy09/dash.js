@@ -95,19 +95,8 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
         virtualBuffer: undefined,
         playbackController: undefined,
         textSourceBuffer:undefined,
-        eventsArray: undefined,
-        requiredEvents: undefined,
 
         setup: function() {
-            this.eventsArray = {"events":[
-                {"start":0,"end":18,"keywords":["begin","curve","racing","desert"]},
-                {"start":18,"end":44,"keywords":["racing","line","desert"]},
-                {"start":44,"end":55,"keywords":["city"]},
-                {"start":55,"end":91,"keywords":["racing","city"]},
-                {"start":91,"end":113,"keywords":["racing","line"]},
-                {"start":113,"end":132,"keywords":["road"]},
-                {"start":132,"end":260,"keywords":["racing","desert"]}
-            ]};
             this[MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING] = onPlaybackSeeking;
         },
 
@@ -118,8 +107,9 @@ MediaPlayer.rules.VideoSkimmingRule = function () {
         },
 
         execute: function(context, callback) {
+            console.log(callback);
             //this.requiredEvents = getArray();
-            var playArray = SegmentController(this.eventsArray,playRule);
+            var playArray = SegmentController(desc,playRule);
             //var pbtime = this.playbackController.getTime();
             /**/
             var mediaInfo = context.getMediaInfo(),

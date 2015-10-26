@@ -25,7 +25,6 @@ Dash.create = function(video, source, context)
     if (typeof video === "undefined" || video.nodeName != "VIDEO") return null;
 
     var player, videoID = (video.id || video.name || "video element");
-    console.log(video.name);
     context = context || new Dash.di.DashContext();
     source = source || [].slice.call(video.querySelectorAll("source")).filter(function(s){return s.type == Dash.supportedManifestMimeTypes.mimeType;})[0];
     if (source === undefined && video.src)

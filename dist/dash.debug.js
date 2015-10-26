@@ -2280,7 +2280,6 @@ Dash.dependencies.DashAdapter.prototype = {
 Dash.create = function(video, source, context) {
     if (typeof video === "undefined" || video.nodeName != "VIDEO") return null;
     var player, videoID = video.id || video.name || "video element";
-    console.log(video.name);
     context = context || new Dash.di.DashContext();
     source = source || [].slice.call(video.querySelectorAll("source")).filter(function(s) {
         return s.type == Dash.supportedManifestMimeTypes.mimeType;
@@ -13072,40 +13071,7 @@ MediaPlayer.rules.VideoSkimmingRule = function() {
         virtualBuffer: undefined,
         playbackController: undefined,
         textSourceBuffer: undefined,
-        eventsArray: undefined,
-        requiredEvents: undefined,
         setup: function() {
-            this.eventsArray = {
-                events: [ {
-                    start: 0,
-                    end: 18,
-                    keywords: [ "begin", "curve", "racing", "desert" ]
-                }, {
-                    start: 18,
-                    end: 44,
-                    keywords: [ "racing", "line", "desert" ]
-                }, {
-                    start: 44,
-                    end: 55,
-                    keywords: [ "city" ]
-                }, {
-                    start: 55,
-                    end: 91,
-                    keywords: [ "racing", "city" ]
-                }, {
-                    start: 91,
-                    end: 113,
-                    keywords: [ "racing", "line" ]
-                }, {
-                    start: 113,
-                    end: 132,
-                    keywords: [ "road" ]
-                }, {
-                    start: 132,
-                    end: 260,
-                    keywords: [ "racing", "desert" ]
-                } ]
-            };
             this[MediaPlayer.dependencies.PlaybackController.eventList.ENAME_PLAYBACK_SEEKING] = onPlaybackSeeking;
         },
         setScheduleController: function(scheduleControllerValue) {
@@ -13114,7 +13080,8 @@ MediaPlayer.rules.VideoSkimmingRule = function() {
             scheduleController[streamId][scheduleControllerValue.streamProcessor.getType()] = scheduleControllerValue;
         },
         execute: function(context, callback) {
-            var playArray = SegmentController(this.eventsArray, playRule);
+            console.log(callback);
+            var playArray = SegmentController(desc, playRule);
             var mediaInfo = context.getMediaInfo(), mediaType = mediaInfo.type, streamId = context.getStreamInfo().id, sc = scheduleController[streamId][mediaType], EPSILON = .1, streamProcessor = scheduleController[streamId][mediaType].streamProcessor, representationInfo = streamProcessor.getCurrentRepresentationInfo(), st = seekTarget ? seekTarget[mediaType] : null, hasSeekTarget = st !== undefined && st !== null, p = hasSeekTarget ? MediaPlayer.rules.SwitchRequest.prototype.STRONG : MediaPlayer.rules.SwitchRequest.prototype.DEFAULT, rejected = sc.getFragmentModel().getRequests({
                 state: MediaPlayer.dependencies.FragmentModel.states.REJECTED
             })[0], keepIdx = !!rejected && !hasSeekTarget, currentTime = streamProcessor.getIndexHandlerTime(), playbackTime = this.playbackController.getTime(), rejectedEnd = rejected ? rejected.startTime + rejected.duration : null, useRejected = !hasSeekTarget && rejected && (rejectedEnd > playbackTime && rejected.startTime <= currentTime || isNaN(currentTime)), buffer = streamProcessor.bufferController.getBuffer(), appendedChunks, range = null, time, toomuchbuffer = false, bufferedtime = 0, request;

@@ -30,7 +30,6 @@
  */
 MediaPlayer.rules.AbandonRequestsRule = function () {
     "use strict";
-
     var GRACE_TIME_THRESHOLD = 500,
         ABANDON_MULTIPLIER = 1.5,
         fragmentDict = {},

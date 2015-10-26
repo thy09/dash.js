@@ -138,6 +138,7 @@ MediaPlayer.dependencies.AbrController = function () {
                     rules = self.abrRulesCollection.getRules(MediaPlayer.rules.ABRRulesCollection.prototype.ABANDON_FRAGMENT_RULES),
                     schduleController = streamProcessorDict[type].getScheduleController(),
                     fragmentModel = schduleController.getFragmentModel(),
+
                     callback = function (switchRequest) {
 
                         function setupTimeout(type){
@@ -162,7 +163,6 @@ MediaPlayer.dependencies.AbrController = function () {
                             }
                         }
                     };
-
                 self.rulesController.applyRules(rules, streamProcessorDict[type], callback, evt, function(currentValue, newValue) {
                     return newValue;
                 });
